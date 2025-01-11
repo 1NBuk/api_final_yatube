@@ -1,101 +1,115 @@
+from http import HTTPStatus
+
 import pytest
-from api.models import Group
+
+from posts.models import Group
 
 
+@pytest.mark.django_db(transaction=True)
 class TestGroupAPI:
 
-    @pytest.mark.django_db(transaction=True)
-    def test_group_not_found(self, client, post, group_1):
-        response = client.get("/api/v1/group/")
+    group_url = '/api/v1/groups/'
+    group_detail_url = '/api/v1/groups/{group_id}/'
 
-        assert (
-            response.status_code != 404
-        ), "Страница `/api/v1/group/` не найдена, проверьте этот адрес в *urls.py*"
+    def check_group_info(self, group_info, url):
+        assert 'id' in group_info, (
+            f'Ответ на GET-запрос к `{url}` содержит неполную информацию о '
+            'группе. Проверьте, что поле `id` добавлено в список полей '
+            '`fields` сериализатора модели `Group`.'
+        )
+        assert 'title' in group_info, (
+            f'Ответ на GET-запрос к `{url}` содержит неполную информацию о '
+            'группе. Проверьте, что поле `title` добавлено в список полей '
+            '`fields` сериализатора модели `Group`.'
+        )
+        assert 'slug' in group_info, (
+            f'Ответ на GET-запрос к `{url}` содержит неполную информацию о '
+            'группе. Проверьте, что поле `slug` добавлено в список полей '
+            '`fields` сериализатора модели `Group`.'
+        )
+        assert 'description' in group_info, (
+            f'Ответ на GET-запрос к `{url}` содержит неполную информацию о '
+            'группе. Проверьте, что поле `description` добавлено в список '
+            'полей `fields` сериализатора модели `Group`.'
+        )
 
-    @pytest.mark.django_db(transaction=True)
-    def test_group_not_auth(self, client, post, group_1):
-        response = client.get("/api/v1/group/")
-        assert (
-            response.status_code == 200
-        ), "Проверьте, что `/api/v1/group/` при запросе без токена возвращаете статус 200"
+    def test_group_not_found(self, client, group_1):
+        response = client.get(self.group_url)
 
-    @pytest.mark.django_db(transaction=True)
-    def test_group_get(self, user_client, post, another_post, group_1, group_2):
-        response = user_client.get("/api/v1/group/")
-        assert (
-            response.status_code == 200
-        ), "Проверьте, что при GET запросе `/api/v1/group/` с токеном авторизации возвращаетсся статус 200"
+        assert response.status_code != HTTPStatus.NOT_FOUND, (
+            f'Эндпоинт `{self.group_url}` не найден, проверьте настройки в '
+            '*urls.py*.'
+        )
+
+    def test_group_list_not_auth(self, client, post, group_1):
+        response = client.get(self.group_url)
+        assert response.status_code == HTTPStatus.OK, (
+            'Проверьте, что GET-запрос неавторизованного пользователя к '
+            f'`{self.group_url}` возвращает ответ со статусом 200.'
+        )
+
+    def test_group_page_not_found(self, client, group_1):
+        response = client.get(
+            self.group_detail_url.format(group_id=group_1.id)
+        )
+        assert response.status_code != HTTPStatus.NOT_FOUND, (
+            f'Эндпоинт `{self.group_detail_url}` не найден, проверьте '
+            'настройки в *urls.py*.'
+        )
+
+    def test_group_single_not_auth(self, client, group_1):
+        response = client.get(
+            self.group_detail_url.format(group_id=group_1.id)
+        )
+        assert response.status_code == HTTPStatus.OK, (
+            'Проверьте, что GET-запрос неавторизованного пользователя к '
+            f'`{self.group_detail_url}` возвращает ответ со статусом 200.'
+        )
+
+    def test_group_auth_get(self, user_client, group_1, group_2):
+        response = user_client.get(self.group_url)
+        assert response.status_code == HTTPStatus.OK, (
+            'Проверьте, что для авторизованного пользователя GET-запрос к '
+            f'{self.group_url}` возвращает ответ со статусом 200.'
+        )
 
         test_data = response.json()
+        assert isinstance(test_data, list), (
+            'Проверьте, что для авторизованного пользователя '
+            f'GET-запрос к `{self.group_url}` возвращает информацию о группах '
+            'в виде списка.'
+        )
+        assert len(test_data) == Group.objects.count(), (
+            'Проверьте, что для авторизованного пользователя GET-запрос к '
+            f'`{self.group_url}` возвращает информацию обо всех существующих '
+            'группах.'
+        )
 
-        assert (
-            type(test_data) == list
-        ), "Проверьте, что при GET запросе на `/api/v1/group/` возвращается список"
-
-        assert (
-            len(test_data) == Group.objects.count()
-        ), "Проверьте, что при GET запросе на `/api/v1/group/` возвращается весь список групп"
-
-        group = Group.objects.all()[0]
         test_group = test_data[0]
-        assert (
-            "id" in test_group
-        ), "Проверьте, что добавили `id` в список полей `fields` сериализатора модели Group"
-        assert (
-            "title" in test_group
-        ), "Проверьте, что добавили `title` в список полей `fields` сериализатора модели Group"
+        self.check_group_info(test_group, self.group_url)
 
-        assert (
-            test_group["id"] == group.id
-        ), "Проверьте, что при GET запросе на `/api/v1/group/` возвращается весь список групп"
-
-    @pytest.mark.django_db(transaction=True)
     def test_group_create(self, user_client, group_1, group_2):
-        group_count = Group.objects.count()
-
-        data = {}
-        response = user_client.post("/api/v1/group/", data=data)
-        assert (
-            response.status_code == 400
-        ), "Проверьте, что при POST запросе на `/api/v1/group/` с не правильными данными возвращается статус 400"
-
-        data = {"title": "Группа  номер 3"}
-        response = user_client.post("/api/v1/group/", data=data)
-        assert (
-            response.status_code == 201
-        ), "Проверьте, что при POST запросе на `/api/v1/group/` с правильными данными возвращается статус 201"
-
-        test_data = response.json()
-
-        msg_error = "Проверьте, что при POST запросе на `/api/v1/group/` возвращается словарь с данными новой группы"
-        assert type(test_data) == dict, msg_error
-        assert test_data.get("title") == data["title"], msg_error
-
-        assert (
-            group_count + 1 == Group.objects.count()
-        ), "Проверьте, что при POST запросе на `/api/v1/group/` создается группа"
-
-    @pytest.mark.django_db(transaction=True)
-    def test_group_get_post(
-        self, user_client, post, post_2, another_post, group_1, group_2
-    ):
-        response = user_client.get(f"/api/v1/posts/")
-        assert (
-            response.status_code == 200
-        ), "Страница `/api/v1/posts/` не найдена, проверьте этот адрес в *urls.py*"
-        test_data = response.json()
-        assert (
-            len(test_data) == 3
-        ), "Проверьте, что при GET запросе на `/api/v1/posts/` возвращается список всех постов"
-
-        response = user_client.get(f"/api/v1/posts/?group={group_2.id}")
-        assert len(response.json()) == 1, (
-            "Проверьте, что при GET запросе с параметром `group` на `/api/v1/posts/` "
-            "возвращается список соответствующих постов"
+        data = {'title': 'Группа  номер 3'}
+        response = user_client.post(self.group_url, data=data)
+        assert response.status_code == HTTPStatus.METHOD_NOT_ALLOWED, (
+            'Убедитесь, что группу можно создавать только через админку и что '
+            f'при попытке создать её через POST-запрос к `{self.group_url}` '
+            'возвращается статус 405.'
         )
 
-        response = user_client.get(f"/api/v1/posts/?group={group_1.id}")
-        assert len(response.json()) == 2, (
-            "Проверьте, что при GET запросе с параметром `group` на `/api/v1/posts/` "
-            "возвращается список соответствующих постов"
+    def test_group_page_auth_get(self, user_client, group_1):
+        response = user_client.get(
+            self.group_detail_url.format(group_id=group_1.id)
         )
+        assert response.status_code == HTTPStatus.OK, (
+            'Проверьте, что при GET-запросе авторизованного пользователя к '
+            f'`{self.group_detail_url}` возвращается ответ со статусом 200.'
+        )
+
+        test_data = response.json()
+        assert isinstance(test_data, dict), (
+            'Проверьте, что при GET-запросе авторизованного пользователя к '
+            f'`{self.group_detail_url}` информация о группе возвращается в '
+            'виде словаря.'
+        )
+        self.check_group_info(test_data, '/api/v1/groups/{group_id}/')
