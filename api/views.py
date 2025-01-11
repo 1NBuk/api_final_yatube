@@ -12,9 +12,8 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ('group',)
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrReadOnly)
+    filterset_fields = ("group",)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -22,34 +21,33 @@ class PostViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrReadOnly)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)
 
     def get_post(self, pk):
         return get_object_or_404(Post, pk=pk)
 
     def get_queryset(self):
-        post = self.get_post(self.kwargs.get('post_id'))
+        post = self.get_post(self.kwargs.get("post_id"))
         return post.comments
 
     def perform_create(self, serializer):
-        post = self.get_post(self.kwargs.get('post_id'))
+        post = self.get_post(self.kwargs.get("post_id"))
         serializer.save(author=self.request.user, post=post)
 
 
-class GroupViewSet(mixins.CreateModelMixin,
-                   mixins.ListModelMixin,
-                   viewsets.GenericViewSet):
+class GroupViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
 
-class FollowViewSet(mixins.CreateModelMixin,
-                    mixins.ListModelMixin,
-                    viewsets.GenericViewSet):
+class FollowViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
     queryset = Follow.objects.all()
     serializer_class = FollowSerializer
     filter_backends = (filters.SearchFilter,)
-    search_fields = ('=user__username', '=following__username')
+    search_fields = ("=user__username", "=following__username")
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
