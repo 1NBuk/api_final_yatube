@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions, viewsets, status, filters, mixins
-from rest_framework.response import Response
 from .models import User, Post, Comment, Group, Follow
 from .serializers import PostSerializer, CommentSerializer
 from .serializers import GroupSerializer, FollowSerializer
@@ -13,7 +12,9 @@ class PostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ("group",)
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)
+    permission_classes = (
+        permissions.IsAuthenticatedOrReadOnly,
+        IsOwnerOrReadOnly)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -21,7 +22,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly)
+    permission_classes = (
+        permissions.IsAuthenticatedOrReadOnly,
+        IsOwnerOrReadOnly)
 
     def get_post(self, pk):
         return get_object_or_404(Post, pk=pk)
